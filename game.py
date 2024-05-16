@@ -1,9 +1,10 @@
 import pygame, sys, random, button
+from networking import Network
 
 #Classes
 class Ball:
-    def __init__(self, rectangle, speed):
-        self.rectangle = rectangle
+    def __init__(self, speed):
+        self.rectangle = pygame.Rect(screen_width/2 - 15, screen_height/2 - 15, 30, 30)
         self.speed_x = speed * random.choice((1, -1))
         self.speed_y = speed * random.choice((1, -1))
         self.score_time = 0 
@@ -69,8 +70,8 @@ class Ball:
         screen.blit(timer_text, (633, 380))
 
 class Player:
-    def __init__(self, rectangle, speed, score = 0):
-        self.rectangle = rectangle
+    def __init__(self, left, top, speed, score = 0):
+        self.rectangle = pygame.Rect(left, top, 10, 140)
         self.speed = speed
         self.score = 0
         self.motion = 0
@@ -117,17 +118,20 @@ class Game:
             self.ball.reset_ball()
 
     def run_game(self):
-        pygame.draw.aaline(screen, light_grey, (screen_width/2, 0), (screen_width/2, screen_height))
         game_ball.ball_animations(self.player0, self.player1)
         self.player0.player_animations()
         self.player1.player_animations()
         self.reset_ball()
+        self.update()
+        game_info = GameInfo(self, self.player0, self.player1)
+        return game_info
+    
+    def update(self):
+        pygame.draw.aaline(screen, light_grey, (screen_width/2, 0), (screen_width/2, screen_height))
         pygame.draw.rect(screen, light_grey, self.player0.rectangle) #In other words, screen.fill is below the players, ball and aaline
         pygame.draw.rect(screen, light_grey, self.player1.rectangle)
         pygame.draw.ellipse(screen, light_grey, self.ball.rectangle)
         self.scoreboard()
-        game_info = GameInfo(self, self.player0, self.player1)
-        return game_info
 
     def scoreboard(self):
         player0_text = score_font.render(f"{self.p0_score}", False, light_grey)
@@ -150,33 +154,27 @@ grey_color = pygame.Color('gray12')
 light_grey = pygame.Color(200, 200, 200)
 grey_again = pygame.Color('gray75')
 
-#Player Rectangles
-ball_rect = pygame.Rect(screen_width/2 - 15, screen_height/2 - 15, 30, 30)
-player0_rect = pygame.Rect(screen_width - 20, screen_height/2 - 70, 10, 140)
-player1_rect = pygame.Rect(10, screen_height/2 - 70, 10, 140)
-player2_rect = pygame.Rect(10, screen_height/2 - 70, 10, 140)
-
 #Initate Sprites
-game_ball = Ball(ball_rect, 7) #first arg is a rectangle that creates a "frame" to contain the size of the ball
-player0 = Player(player0_rect, 7)
-player1 = AI(player1_rect, 7)
-player2 = Player(player2_rect, 7)
+game_ball = Ball(7) #first arg is a rectangle that creates a "frame" to contain the size of the ball
+player0 = Player(screen_width - 20, screen_height/2 - 70, 7)
+player1 = AI(10, screen_height/2 - 70, 7)
+player2 = Player(10, screen_height/2 - 70, 7)
 
 # Initializing Fonts
 score_font = pygame.font.SysFont("onyx", 48)
 timer_font = pygame.font.SysFont("onyx", 72)
 
-directory = "Pong Game/game/PressStart2P-vaV7.ttf"
+font_location = ".\game\PressStart2P-vaV7.ttf"
 
-ALT_FONT = pygame.font.Font(directory, 40) #"menimo"
+ALT_FONT = pygame.font.Font(font_location, 40) #"menimo"
 ALT_TEXT = ALT_FONT.render("menimo", True, light_grey)
 ALT_RECT = ALT_TEXT.get_rect(center = (640, 160))
 
-MENU_FONT = pygame.font.Font(directory, 100) #"Pong"
+MENU_FONT = pygame.font.Font(font_location, 100) #"Pong"
 MENU_TEXT = MENU_FONT.render("Pong", True, light_grey)
 MENU_RECT = MENU_TEXT.get_rect(center = (640, 220))
 
-BUTTON_FONT = pygame.font.Font(directory, 65)
+BUTTON_FONT = pygame.font.Font(font_location, 65)
 
 #Main Menu function
 def main_manu():
@@ -223,7 +221,7 @@ def play_menu():
         one_p_button = button.Button(None, 410, 460, ALT_FONT, "1 Player", light_grey, pygame.Color('darkslategray4'))
         two_p_button = button.Button(None, 880, 460, ALT_FONT, "2 Player", light_grey, pygame.Color('darkslategray4'))
         online_button = button.Button(None, 640, 650, ALT_FONT, "Online???", light_grey, pygame.Color('darkslategray4'))
-        back_button = button.Button(None, 640, 820, pygame.font.Font(directory, 25), "Back", light_grey, pygame.Color('darkslategray4'))
+        back_button = button.Button(None, 640, 820, pygame.font.Font(font_location, 25), "Back", light_grey, pygame.Color('darkslategray4'))
 
         screen.blit(MENU_TEXT, MENU_RECT)
         screen.blit(ALT_TEXT, ALT_RECT)
@@ -305,33 +303,54 @@ def play_game(p1, p2):
         pygame.display.flip()
         clock.tick(60)
 
+#Online Functionality
+def read_pos(string): #takes string tuple and converts it to an actual tuple of integers
+    string = string.split(",")
+    return int(string[0]), int(string[1])
+def make_pos(tup): #takes tuple of integers and converts it into a string
+    return str(tup[0]) + "," + str(tup[1]) 
+
 def online():
     running = True
-    while running:
-        screen.fill(pygame.Color('gray5'))
-
-        MENU_MOUSE_POS = pygame.mouse.get_pos()
-
-        SMILE_FONT = pygame.font.Font("Pong Game/PressStart2P-vaV7.ttf", 300) #"Pong"
-
-        smilely = button.Button(None, 640, 480, SMILE_FONT, ":)", light_grey, pygame.Color('darkslategray4'))
-        smilely.hover(MENU_MOUSE_POS)
-        smilely.update(screen)
-        
+    n = Network()
+    startPos = read_pos(n.getPos())
+    op1 = Player(startPos[0], startPos[1], 7)
+    op2 = Player(10, screen_height/2 - 70, 7)
+    pong = Game(game_ball, op1, op2)
+    game_ball.score_time = 0
+    pong.player0.rectangle.center = (screen_width - 15, screen_height/2)
+    pong.player1.rectangle.center = (15, screen_height/2)
+    game_ball.reset_ball()
+    game_ball.prematch_timer()
+    while running: #usually at the bottom of the code
+        p2Pos = read_pos(n.send(make_pos((op1.rectangle.x, op2.rectangle.y))))
+        op2.rectangle.x = p2Pos[0]
+        op2.rectangle.y = p2Pos[1]
         for event in pygame.event.get(): #This specific loop handles the inputs of the game
             if event.type == pygame.QUIT:
                 pygame.quit()
                 sys.exit()
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                if pygame.mouse.get_pressed()[0]:
-                    if smilely.click(MENU_MOUSE_POS):
-                        pygame.quit()
-                        sys.exit()
+            #Right Paddle Movement
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     running = False
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_DOWN:
+                    pong.player0.motion += pong.player0.speed
+                if event.key == pygame.K_UP:
+                    pong.player0.motion -= pong.player0.speed
+            if event.type == pygame.KEYUP:
+                if event.key == pygame.K_DOWN:
+                    pong.player0.motion -= pong.player0.speed
+                if event.key == pygame.K_UP:
+                    pong.player0.motion += pong.player0.speed
+        
+        # Visuals
+        screen.fill(grey_color) #Succesive elements are drawn on top of each other
+
+        pong.run_game()
         
         pygame.display.flip()
-        clock.tick(120)
+        clock.tick(60)
 
 main_manu()
